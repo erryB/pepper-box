@@ -9,7 +9,7 @@
     <version>1.0</version>
     <properties>
         <jmeter.version>3.1</jmeter.version>
-        <kafka.version>0.9.0.1</kafka.version>
+        <kafka.version>1.0.2</kafka.version>
         <jdk.version>1.8</jdk.version>
         <joda-time.version>2.9.7</joda-time.version>
         <guava.version>21.0</guava.version>

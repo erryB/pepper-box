@@ -19,6 +19,8 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
+import org.apache.kafka.common.serialization.StringSerializer;
+
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -58,9 +60,11 @@ public class PepperBoxLoadGenerator extends Thread {
      * @param duration
      * @throws PepperBoxException
      */
-    public PepperBoxLoadGenerator(String schemaFile, String producerProps, Integer throughput, Integer duration) throws PepperBoxException {
+    public PepperBoxLoadGenerator(String schemaFile, String producerProps, Integer throughput, Integer duration, final KafkaProducer<String, String> producer) throws PepperBoxException {
 
         Path path = Paths.get(schemaFile);
+        this.producer = producer;
+
         try {
             String inputSchema = new String(Files.readAllBytes(path));
             SchemaProcessor schemaProcessor = new SchemaProcessor();
@@ -68,46 +72,25 @@ public class PepperBoxLoadGenerator extends Thread {
         } catch (IOException e) {
             throw new PepperBoxException(e);
         }
+        Properties inputProps = getInputProperties(producerProps);
+
+        limiter = RateLimiter.create(throughput);
+        durationInMillis = TimeUnit.SECONDS.toMillis(duration);
+        topic = inputProps.getProperty(ProducerKeys.KAFKA_TOPIC_CONFIG);
+        
+    }
+
+    private static Properties getInputProperties(String producerProps) throws PepperBoxException {
+
         Properties inputProps = new Properties();
         try {
             inputProps.load(new FileInputStream(producerProps));
         } catch (IOException e) {
             throw new PepperBoxException(e);
+           
         }
+        return inputProps;
 
-        limiter = RateLimiter.create(throughput);
-        durationInMillis = TimeUnit.SECONDS.toMillis(duration);
-        Properties brokerProps = new Properties();
-        brokerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getBrokerServers(inputProps));
-        brokerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, inputProps.getProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG));
-        brokerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, inputProps.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG));
-        brokerProps.put(ProducerConfig.ACKS_CONFIG, inputProps.getProperty(ProducerConfig.ACKS_CONFIG));
-        brokerProps.put(ProducerConfig.SEND_BUFFER_CONFIG, inputProps.getProperty(ProducerConfig.SEND_BUFFER_CONFIG));
-        brokerProps.put(ProducerConfig.RECEIVE_BUFFER_CONFIG, inputProps.getProperty(ProducerConfig.RECEIVE_BUFFER_CONFIG));
-        brokerProps.put(ProducerConfig.BATCH_SIZE_CONFIG, inputProps.getProperty(ProducerConfig.BATCH_SIZE_CONFIG));
-        brokerProps.put(ProducerConfig.LINGER_MS_CONFIG, inputProps.getProperty(ProducerConfig.LINGER_MS_CONFIG));
-        brokerProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, inputProps.getProperty(ProducerConfig.BUFFER_MEMORY_CONFIG));
-        brokerProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, inputProps.getProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG));
-
-        String kerbsEnabled = inputProps.getProperty(ProducerKeys.KERBEROS_ENABLED);
-
-        if (kerbsEnabled != null && kerbsEnabled.equals(ProducerKeys.FLAG_YES)) {
-
-            System.setProperty(ProducerKeys.JAVA_SEC_AUTH_LOGIN_CONFIG, inputProps.getProperty(ProducerKeys.JAVA_SEC_AUTH_LOGIN_CONFIG));
-            System.setProperty(ProducerKeys.JAVA_SEC_KRB5_CONFIG, inputProps.getProperty(ProducerKeys.JAVA_SEC_KRB5_CONFIG));
-            brokerProps.put(ProducerKeys.SASL_KERBEROS_SERVICE_NAME, inputProps.getProperty(ProducerKeys.SASL_KERBEROS_SERVICE_NAME));
-            brokerProps.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, inputProps.getProperty(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG));
-        }
-
-        Set<String> parameters = inputProps.stringPropertyNames();
-        parameters.forEach(parameter -> {
-            if (parameter.startsWith("_")) {
-                brokerProps.put(parameter.substring(1), inputProps.getProperty(parameter));
-            }
-        });
-
-        topic = inputProps.getProperty(ProducerKeys.KAFKA_TOPIC_CONFIG);
-        producer = new KafkaProducer<>(brokerProps);
     }
 
     /**
@@ -182,6 +165,7 @@ public class PepperBoxLoadGenerator extends Thread {
         limiter.acquire();
         ProducerRecord<String, String> keyedMsg = new ProducerRecord<>(topic, iterator.next().toString());
         producer.send(keyedMsg);
+        System.out.println("message sent!");
     }
 
     public static void checkRequiredArgs(OptionParser parser, OptionSet options, OptionSpec... required) {
@@ -189,6 +173,44 @@ public class PepperBoxLoadGenerator extends Thread {
             if (!options.has(optionSpec)) {
                 CommandLineUtils.printUsageAndDie(parser, "Missing required argument \"" + optionSpec + "\"");
             }
+        }
+    }
+
+    private static KafkaProducer<String, String> createProducer(String producerProps) {
+        try{
+            Properties inputProps = getInputProperties(producerProps);
+            
+            Properties brokerProps = inputProps;
+            
+            if(inputProps.getProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG)== null){
+                brokerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            } 
+            
+            if(inputProps.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG)==null){
+                brokerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            } 
+            
+            String kerbsEnabled = inputProps.getProperty(ProducerKeys.KERBEROS_ENABLED);
+
+            if (kerbsEnabled != null && kerbsEnabled.equals(ProducerKeys.FLAG_YES)) {
+
+                System.setProperty(ProducerKeys.JAVA_SEC_AUTH_LOGIN_CONFIG, inputProps.getProperty(ProducerKeys.JAVA_SEC_AUTH_LOGIN_CONFIG));
+                System.setProperty(ProducerKeys.JAVA_SEC_KRB5_CONFIG, inputProps.getProperty(ProducerKeys.JAVA_SEC_KRB5_CONFIG));
+                brokerProps.put(ProducerKeys.SASL_KERBEROS_SERVICE_NAME, inputProps.getProperty(ProducerKeys.SASL_KERBEROS_SERVICE_NAME));
+                brokerProps.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, inputProps.getProperty(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG));
+            }
+
+            Set<String> parameters = inputProps.stringPropertyNames();
+            parameters.forEach(parameter -> {
+                if (parameter.startsWith("_")) {
+                    brokerProps.put(parameter.substring(1), inputProps.getProperty(parameter));
+                }
+            });
+            return new KafkaProducer<>(brokerProps);
+        } catch (Exception e){
+            System.out.println("Failed to create producer with exception: " + e);
+            System.exit(0);
+            return null;        //unreachable
         }
     }
 
@@ -223,7 +245,8 @@ public class PepperBoxLoadGenerator extends Thread {
         try {
             int totalThreads = options.valueOf(threadCount);
             for (int i = 0; i < totalThreads; i++) {
-                PepperBoxLoadGenerator jsonProducer = new PepperBoxLoadGenerator(options.valueOf(schemaFile), options.valueOf(producerConfig), options.valueOf(throughput), options.valueOf(duration));
+                final KafkaProducer<String, String> producer = createProducer(options.valueOf(producerConfig)); 
+                PepperBoxLoadGenerator jsonProducer = new PepperBoxLoadGenerator(options.valueOf(schemaFile), options.valueOf(producerConfig), options.valueOf(throughput), options.valueOf(duration), producer);
                 jsonProducer.start();
             }
 
