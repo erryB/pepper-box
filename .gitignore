@@ -70,6 +70,8 @@ $RECYCLE.BIN/
 target
 .vscode
 .settings
+.classpath
+.project
 pbox-producer-private.properties
 pbox-producer-complete-private.properties
 
