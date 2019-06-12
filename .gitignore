@@ -72,6 +72,4 @@ target
 .settings
 .classpath
 .project
-pbox-producer-private.properties
-pbox-producer-complete-private.properties
-
+*private*
