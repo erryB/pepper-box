@@ -30,15 +30,18 @@ Be careful because this change has some effects: we had to change imports for *S
 Microsoft provides a [sample](https://github.com/Azure/azure-event-hubs-for-kafka) and some [guidelines](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-quickstart-kafka-enabled-event-hubs) to explain how to stream messages into Event Hubs for Apache Kafka. Following the same approach, we made some changes to *PepperboxLoadGenerator.java* file: we added a static method called *createProducer* which returns a *KafkaProducer* to be used as final parameter in the constructor. All the checks on the input files are performed within this method, which is called in the *main* before the creation of the *PepperboxLoadGenerator*, as you can see below.
 
 ```
-try {
-    int totalThreads = options.valueOf(threadCount);
-    for (int i = 0; i < totalThreads; i++) {
-        final KafkaProducer<String, String> producer = createProducer(options.valueOf(producerConfig));
-        PepperBoxLoadGenerator jsonProducer = new PepperBoxLoadGenerator(options.valueOf(schemaFile), options.valueOf(producerConfig), options.valueOf(throughput), options.valueOf(duration), producer);
-        jsonProducer.start();
+public static void main(String[] args) {
+    [...]
+    try {
+        int totalThreads = options.valueOf(threadCount);
+        for (int i = 0; i < totalThreads; i++) {
+            final KafkaProducer<String, String> producer = createProducer(options.valueOf(producerConfig));
+            PepperBoxLoadGenerator jsonProducer = new PepperBoxLoadGenerator(options.valueOf(schemaFile), options.valueOf(producerConfig), options.valueOf(throughput), options.valueOf(duration), producer);
+            jsonProducer.start();
+        }
+    } catch (Exception e) {
+        LOGGER.log(Level.SEVERE, "Failed to generate load", e);
     }
-} catch (Exception e) {
-    LOGGER.log(Level.SEVERE, "Failed to generate load", e);
 }
 ```
 
