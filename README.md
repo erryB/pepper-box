@@ -9,7 +9,7 @@ The version you can find here has been modified in order to leverage the kafka e
 
 ### Environment setup
 
-In order to start sending messages, you need to setup your Azure environment first: please refer to Microsoft official documentation to [create your first Event Hub](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-quickstart-cli). As you can see, there are different ways to do that, just follow the one you prefer. 
+In order to start sending messages, you need to setup your Azure environment first: please refer to Microsoft official documentation to [create a Kafka enabled Event Hub namespace](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-quickstart-kafka-enabled-event-hubs#create-a-kafka-enabled-event-hubs-namespace).
 
 In terms of editor, I would recommend [Visual Studio Code](https://code.visualstudio.com/) for development and test. Adding a simple extension, you can also monitor the messages coming into your Event Hub.
 
@@ -43,14 +43,15 @@ try {
 ```
 
 Of course, you also need to provide credentials to allow your application to send data to you Event Hub. These parameters must be added in the producer properties file.
-In this sample, we added the [files folder](https://github.com/erryB/pepper-box/tree/master/files), which includes 2 properties files, for simple and complete tests. In both of them, as you can see below, the *bootstrap.servers* requires your Event Hubs Namespace and the *sasl.jaas.config* requires your Event Hubs Connection String. Follow [these instructions](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-get-connection-string) if you don't know where to find it.
+In this sample, we added the [files folder](https://github.com/erryB/pepper-box/tree/master/files), which includes 2 properties files, for simple and complete tests. In both of them, as you can see below, the *bootstrap.servers* requires your Event Hub FQDN and the *sasl.jaas.config* requires your Event Hubs Connection String. Follow [these instructions](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-get-connection-string) if you don't know where to find these information.
+Eventually, you need to use the name of the specific Event Hub you want to address in your namespace as *kafka.topic.name*.
 
 ```
-bootstrap.servers=<your-EH-namespace>.servicebus.windows.net:9093
+bootstrap.servers=<your-EH-FQDN>:9093
 security.protocol=SASL_SSL
 sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="<your-EH-connection-string>";
-kafka.topic.name=test
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="<your-EH-connectionString>";
+kafka.topic.name=<your-EH>
 ```
 
 *And that's it!*
