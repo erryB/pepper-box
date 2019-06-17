@@ -13,7 +13,7 @@ In order to start sending messages, you need to setup your Azure environment fir
 
 In terms of editor, I would recommend [Visual Studio Code](https://code.visualstudio.com/) for development and test. Adding a simple extension, you can also monitor the messages coming into your Event Hub.
 
-## Getting started
+### Getting started
 
 After cloning the repo, you just need to provide the credentials to allow your application to send data to your Event Hub. These parameters must be added in the producer properties file.
 In this sample, we added the [files folder](https://github.com/erryB/pepper-box/tree/master/files), which includes 2 properties files, for simple and complete tests. In both of them, as you can see below, the *bootstrap.servers* requires your Event Hub FQDN and the *sasl.jaas.config* requires your Event Hubs Connection String. Follow [these instructions](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-get-connection-string) if you don't know where to find these information.
